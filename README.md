@@ -43,11 +43,25 @@ Using the first two frames of the same driving sequence, the implementation prod
 | RANSAC outliers | 353 |
 | Inlier ratio | 71.09% |
 
-The following visualization shows a subset of feature correspondences classified as inliers and outliers by RANSAC.
+The following visualization shows a subset of feature correspondences classified as inliers and outliers between the first two frames.
 
 ![RANSAC inlier and outlier matches](results/ransac_matches.png)
 
 Some visually correct feature correspondences may still be classified as outliers because RANSAC evaluates their consistency with the estimated epipolar geometry rather than their visual similarity. Small inaccuracies in feature localization can cause a correct match to exceed the 1-pixel geometric error threshold and be rejected.
+
+### Camera Pose Recovery
+
+The essential matrix encodes the relative rotation and translation direction between two camera views:
+
+$$
+E = [\mathbf{t}]_\times R
+$$
+
+where \(R\) is the \(3 \times 3\) rotation matrix, \(\mathbf{t}\) is the translation vector, and \([\mathbf{t}]_\times\) is the skew-symmetric matrix representing the cross product with \(\mathbf{t}\).
+
+The estimated essential matrix is decomposed to recover the camera's relative rotation and translation direction. Using the matched pixel coordinates and a candidate pose, the 3D positions of corresponding features can be estimated through triangulation, allowing us to check whether they have positive depth in both camera views. Since multiple camera poses can satisfy the same essential matrix, the pose that places the most reconstructed 3D points in front of the camera in both frames is selected. As a result, some matches previously classified as RANSAC inliers may fail this additional geometric check and are excluded from the final set of inliers.
+
+For the first two frames of the driving sequence, 699 of the 868 RANSAC inliers passed pose recovery validation. The recovered rotation was close to the identity matrix, indicating minimal change in orientation, while the estimated camera movement was predominantly forward. Because monocular visual odometry cannot determine absolute scale from two images alone, the translation is recovered as a direction rather than a distance.
 
 ## Dataset
 

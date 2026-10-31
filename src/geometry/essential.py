@@ -27,7 +27,7 @@ def extract_matched_points(
 # ORB matches are not necessarily all correct: two different objects might have similar-looking descriptors, causing the matcher to pair them incorrectly
 # Estimate essential matrix (describes the geometric relationship between two camera views), letting us identify matches consistent with the geometry of camera motion
 def estimate_essential_matrix(
-    points1: np.ndarray,  # (N, 2) array of matched coordinates from image 1
+    points1: np.ndarray,  # (N, 2) array of matched pixel coordinates from image 1
     points2: np.ndarray,
     K: np.ndarray,  # (3, 3) camera intrinsic matrix
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -45,3 +45,31 @@ def estimate_essential_matrix(
         raise ValueError("Essential matrix estimation failed.")
 
     return E, mask
+
+
+# Recover relative camera pose (rotation and translation direction) by decomposing E
+def recover_camera_pose(
+    E: np.ndarray,
+    points1: np.ndarray,
+    points2: np.ndarray,
+    K: np.ndarray,
+    mask: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+
+    # this decomposition produces 4 possible combinations of rotations and translations, so OpenCV selects the pose that produces the most geometrically valid points
+    # some of the inliers pre-selection might not produce valid 3D points during pose recovery, so number of inliers and mask change
+
+    num_inliers, R, t, pose_mask = cv2.recoverPose(  # R: 3x3 rotation matrix, t: 3x1 translation direction, pose_mask: inilier mask after pose recovery
+        E,
+        points1,
+        points2,
+        cameraMatrix=K,
+        mask=mask.copy(),
+    )
+
+    # Camera motion cannot be estimated if there are no matches
+    if num_inliers == 0:
+        raise ValueError("Camera pose recovery failed: no valid inliers.")
+
+    return R, t, pose_mask
+
