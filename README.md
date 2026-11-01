@@ -135,19 +135,25 @@ The visual odometry pipeline was evaluated on the first 100 frames of KITTI Odom
 
 ### Estimated Camera Trajectory
 
-![Estimated camera trajectory](results/estimated_trajectory.png)
+![Estimated camera trajectory](results/estimated_trajectory_100.png)
 
 The estimated trajectory shows predominantly forward motion along the Z-axis, with smaller lateral displacement along the X-axis. Positions are expressed in arbitrary units because absolute translation scale is not observable from monocular images alone.
 
 ### Comparison with Ground Truth
 
-![Estimated trajectory compared with KITTI ground truth](results/trajectory_comparison.png)
+![Estimated trajectory compared with KITTI ground truth](results/trajectory_comparison_100.png)
 
 After global scale alignment, the estimated trajectory follows the overall direction of the KITTI ground-truth trajectory. However, the estimated positions gradually diverge from ground truth, particularly in the lateral direction, indicating accumulated trajectory error.
 
 The scale-aligned ATE RMSE over the first 100 frames is 2.3665 metres. This means that after adjusting for scale, Parallax's estimated camera positions were off by about 2.37 metres overall compared to the actual positions across the first 100 frames.
 
 These results establish an initial baseline for the monocular visual odometry pipeline. Evaluation over longer sequences is needed to better characterize accumulated drift and performance during more complex camera motion.
+
+### Long-Range Trajectory Evaluation
+
+![Estimated vs. ground-truth trajectory over 1,000 frames](results/trajectory_comparison_1000.png)
+
+The estimated trajectory follows the general shape of the ground-truth route but shows increasing positional error over longer distances, reaching a scale-aligned ATE RMSE of 41.55 m over 1,000 frames. The trajectories begin diverging before the low-motion region around frames 535–561, suggesting that the pose recovery failures were not the primary source of error. Differences in the estimated travel distances along various sections of the route indicate that monocular scale ambiguity may be a significant contributor to the accumulated drift.
 
 ## Challenges and Limitations
 
@@ -183,6 +189,16 @@ Evaluation on KITTI sequence 00 demonstrated increasing scale-aligned Absolute T
 | 1,000 | 0.7201 | 41.5530 m |
 
 These results demonstrate the limitations of the current monocular visual odometry baseline over longer sequences. Potential contributors include inaccurate relative motion estimates, unknown per-frame translation scale, and approximations made during pose recovery failures.
+
+### Analysis of Trajectory Error
+
+Visual comparison of the estimated and ground-truth trajectories over 1,000 frames showed that the pipeline captured the general shape of the route, but accumulated substantial positional error.
+
+Although 13 pose recovery failures occurred around frames 535–561, the trajectories had already begun diverging before this region, with no obvious sudden increase in error near the vehicle's stop. This suggests that the failures were not the primary source of the overall trajectory error.
+
+Instead, the differences in estimated travel distances along various sections of the route suggest that monocular scale ambiguity may be a significant contributor. To investigate this, the next step is to compare the current baseline against a diagnostic trajectory constructed using ground-truth frame-to-frame displacement magnitudes and estimated camera motion directions.
+
+This experiment will help distinguish errors caused by translation scale from those caused by inaccurate rotation and translation-direction estimates. Ground-truth displacement will be used only for diagnosis, not as part of the final visual odometry pipeline.
 
 ## Dataset
 

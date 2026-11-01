@@ -8,9 +8,9 @@ from src.evaluation import align_scale, calculate_ate
 
 def main():
 
-    num_frames = 100
+    num_frames = 1000
 
-    # Estimate the accumulated camera poses for the first 100 KITTI frames
+    # Estimate the accumulated camera poses for the first num_frames KITTI frames
     trajectory = run_visual_odometry(
         calibration_path="data/calib/00/calib.txt",
         image_dir="data/sequences/00/image_0",
@@ -34,11 +34,11 @@ def main():
 
     plt.xlabel("X position (arbitrary units)")
     plt.ylabel("Z position (arbitrary units)")
-    plt.title("Estimated Camera Trajectory: KITTI Sequence 00, First 100 Frames")
+    plt.title(f"Estimated Camera Trajectory: KITTI Sequence 00, First {num_frames} Frames")
     plt.axis("equal")
     plt.grid(True)
     plt.legend()
-    plt.savefig("results/estimated_trajectory.png", dpi=200, bbox_inches="tight")
+    plt.savefig(f"results/estimated_trajectory_{num_frames}.png", dpi=200, bbox_inches="tight")
     plt.close()
 
 
@@ -79,6 +79,22 @@ def main():
         linestyle="--",
     )
 
+    # Highlight the low-motion region when it falls within the evaluated frames
+    failure_start = 535
+    failure_end = 561
+
+    if num_frames > failure_start:
+        end = min(failure_end + 1, num_frames)
+
+        plt.plot(
+            estimated_x[failure_start:end],
+            estimated_z[failure_start:end],
+            color="orange",
+            linewidth=4,
+            label="Low-motion region (frames 535–561)",
+            zorder=4,
+        )
+
     # Mark the starting and ending positions of both trajectories
     plt.scatter(
         ground_truth_x[0],
@@ -106,11 +122,11 @@ def main():
 
     plt.xlabel("X position (metres)")
     plt.ylabel("Z position (metres)")
-    plt.title("Estimated vs. Ground-Truth Camera Trajectory: KITTI Sequence 00, First 100 Frames")
+    plt.title(f"Estimated vs. Ground-Truth Camera Trajectory: KITTI Sequence 00, First {num_frames} Frames")
     plt.axis("equal")
     plt.grid(True)
     plt.legend()
-    plt.savefig("results/trajectory_comparison.png", dpi=200, bbox_inches="tight")
+    plt.savefig(f"results/trajectory_comparison_{num_frames}.png", dpi=200, bbox_inches="tight")
     plt.close()
 
     # Calculate the 3D ATE after global scale alignment
