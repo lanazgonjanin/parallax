@@ -149,6 +149,41 @@ The scale-aligned ATE RMSE over the first 100 frames is 2.3665 metres. This mean
 
 These results establish an initial baseline for the monocular visual odometry pipeline. Evaluation over longer sequences is needed to better characterize accumulated drift and performance during more complex camera motion.
 
+## Challenges and Limitations
+
+### Pose Recovery During Low-Motion Frames
+
+During evaluation on the first 1,000 frames of KITTI sequence 00, the pipeline encountered 13 pose recovery failures, concentrated around frames 535–561. Despite a high number of feature matches and RANSAC inliers, OpenCV's `recoverPose()` could not recover a valid camera pose for these frame pairs. This is likely because the inliers did not provide enough reliable information to validate the camera's movement.
+
+Inspection of the corresponding images revealed that the vehicle was approaching a yield sign. Analysis of KITTI ground-truth poses and timestamps confirmed that the vehicle decelerated from approximately 21 km/h to nearly 0 km/h before accelerating again.
+
+This highlighted a limitation of essential-matrix-based motion estimation: when camera movement is really small, there may be insufficient change between consecutive images to reliably estimate its movement direction.
+
+To prevent individual failures from terminating the pipeline, a fallback was implemented that retains the previous camera pose when pose recovery fails. Although this enables longer trajectory reconstruction, it assumes zero movement during failed frame pairs and may introduce additional error.
+
+### Monocular Scale Ambiguity
+
+Since we are working with monocoluar imaging, we cannot recover translation magnitude. Instead, we use a unit-length translation vector, so the current implementation assigns the same translation magnitude to every successfully processed frame pair, regardless of the vehicle's actual displacement. This assumption becomes problematic when the vehicle accelerates, decelerates, or stops.
+
+To evaluate the reconstructed trajectory in metres, a single global scale factor is fitted using KITTI ground-truth positions. This corrects the final estimated position, but it cannot correct differences in displacement between individual frame pairs, since it applies the same multiplier to every estimated translation. Ideally, a different translation magnitude would be needed for each frame pair.
+
+Consequently, the reconstructed trajectory remains subject to scale-related errors even after alignment.
+
+### Accumulated Trajectory Drift
+
+Because each camera pose is calculated from the previous accumulated pose, errors in relative rotation and translation propagate through subsequent estimates.
+
+Evaluation on KITTI sequence 00 demonstrated increasing scale-aligned Absolute Trajectory Error (ATE) as the evaluated sequence length increased:
+
+| Frames | Global Scale Factor | ATE RMSE |
+|---|---:|---:|
+| 100 | 0.9220 | 2.3665 m |
+| 250 | 0.7709 | 12.5190 m |
+| 500 | 0.7310 | 26.7930 m |
+| 1,000 | 0.7201 | 41.5530 m |
+
+These results demonstrate the limitations of the current monocular visual odometry baseline over longer sequences. Potential contributors include inaccurate relative motion estimates, unknown per-frame translation scale, and approximations made during pose recovery failures.
+
 ## Dataset
 
 This project uses the [KITTI Visual Odometry Dataset](https://www.cvlibs.net/datasets/kitti/eval_odometry.php) to develop and evaluate camera-based vehicle localization algorithms.

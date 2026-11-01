@@ -1,6 +1,7 @@
 import numpy as np
 
 # Update the accumulated camera pose using the newest relative motion
+# Lets us store pose info at frame i+1 using motion info from frames 0 to i
 def update_pose(
     current_pose: np.ndarray,  # contains all the accumulated movement from frame 0 to i
     R: np.ndarray,  # relative rotation between frame i and i+1
