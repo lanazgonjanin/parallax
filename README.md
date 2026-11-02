@@ -247,7 +247,68 @@ The accumulated error exhibited abrupt changes around frames 365, 460, and 620�
 
 Since accumulated camera orientations determine how subsequent translation vectors are transformed into the global coordinate system, orientation drift is a likely contributor to the observed positional drift.
 
-These findings suggest that improving the reliability of relative rotation estimation is a promising direction for further development. The next step is to investigate the frame pairs with unusually large rotation errors by examining feature-match quality, RANSAC inlier counts, and pose recovery behaviour.
+These findings suggest that improving the reliability of relative rotation estimation could help reduce accumulated trajectory drift. 
+
+### Investigation of Large Rotation Errors
+
+To investigate the unusually large frame-to-frame rotation errors, selected frame pairs were examined in greater detail. The analysis compared feature-match counts, RANSAC inliers, pose recovery inliers, estimated rotations, ground-truth rotations, and image feature displacement.
+
+Several frame pairs produced rotation estimates between 4° and 8°, despite KITTI ground truth indicating actual rotations below 1°. These inaccurate estimates occurred even when hundreds of feature matches and RANSAC inliers were available, demonstrating that a high inlier count does not necessarily guarantee accurate pose estimation.
+
+These findings motivated an investigation into whether unreliable rotations could be detected and corrected before they propagated through the accumulated camera trajectory.
+
+### Experiment: Fixed Rotation Threshold
+
+An initial experiment attempted to reduce accumulated orientation drift by replacing any estimated frame-to-frame rotation exceeding 2° with the identity matrix, representing no change in camera orientation.
+
+This approach rejected 144 rotations.
+
+![Fixed rotation threshold experiment](results/rotation_filter_comparison_1000.png)
+
+| Metric | Original Baseline | Fixed Rotation Threshold |
+|---|---:|---:|
+| ATE RMSE | 41.5530 m | 75.2892 m |
+| Final accumulated rotation error | 25.8765° | 156.5650° |
+
+The fixed-threshold approach substantially worsened both positional and orientation accuracy. Visual comparison showed that the filtered trajectory failed to reproduce several major turns.
+
+This demonstrated that large rotation magnitudes are not necessarily inaccurate and that a fixed threshold cannot reliably distinguish incorrect estimates from genuine camera motion.
+
+### Temporal Rotation Consistency
+
+To better distinguish incorrect rotation estimates from genuine vehicle turns, the surrounding images of selected high-rotation frame pairs were visually inspected.
+
+![Image context around high-rotation frame pairs](results/rotation_context_contact_sheet.png)
+
+Inspection revealed that some large estimated rotations corresponded to genuine turns, while others occurred during sequences where the vehicle appeared to continue in approximately the same direction. This motivated using information from neighbouring frames to determine whether a large rotation estimate was consistent with the vehicle's surrounding motion.
+
+A temporal consistency check was implemented using the five preceding and five following frame pairs. For each rotation estimate, the median magnitude of these neighbouring rotations was calculated. An estimate was flagged as suspicious only if its rotation magnitude exceeded 2° *and* three times the neighbouring median.
+
+![Temporal rotation consistency](results/rotation_consistency_1000.png)
+
+The method flagged 10 rotations, all of which were confirmed against KITTI ground truth to have errors exceeding 2°, and no rotations were incorrectly flagged. Thus, this method achieved 100% precision and recall on the evaluated sequence.
+
+### Experiment: Temporal Rotation Correction
+
+Rather than replacing flagged rotations with the identity matrix, as in the previous experiment, suspicious rotations were replaced with estimates derived from neighbouring camera motion.
+
+The surrounding rotation matrices were converted into rotation vectors using OpenCV's `Rodrigues()` function. Unlike rotation angles alone, these vectors represent both the magnitude and axis of rotation. The component-wise median of the neighbouring rotation vectors was then calculated and converted back into a rotation matrix to be used as the corrected rotation estimate for the flagged rotation. Other flagged rotations and failed pose recoveries were excluded from this calculation.
+
+The corrected rotations were accumulated with the original estimated translations to reconstruct a new camera trajectory.
+
+![Temporal rotation correction](results/temporal_rotation_correction_1000.png)
+
+| Metric | Original Baseline | Temporal Correction |
+|---|---:|---:|
+| Global scale factor | 0.7201 | 0.7469 |
+| ATE RMSE | 41.5530 m | 14.5524 m |
+| Final accumulated rotation error | 25.8765° | 7.9423° |
+
+Correcting only 10 rotation estimates reduced ATE RMSE by approximately **65.0%** and final accumulated orientation error by **69.3%** over 1,000 frames.
+
+These results demonstrate that a small number of inaccurate rotation estimates contributed substantially to accumulated trajectory drift. Unlike the fixed-threshold approach, temporal correction preserved sustained vehicle turns while reducing the effects of isolated rotation errors.
+
+**Limitations:** The correction requires information from future frames, making the current approach suitable for offline trajectory reconstruction rather than real-time estimation. Additionally, the method was developed and evaluated on the same KITTI sequence segment, so further testing is needed to determine whether it generalizes to unseen driving sequences.
 
 ## Dataset
 
