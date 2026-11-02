@@ -91,7 +91,7 @@ Because monocular visual odometry cannot recover absolute translation scale, eac
 
 ### Global Scale Alignment
 
-Since estimated trajectories are represented by arbitrary units, they must aligned to ground truth using a single global scale factor. Both trajectories are first expressed relative to their initial positions.
+Since estimated trajectories are represented by arbitrary units, they must be aligned to ground truth using a single global scale factor. Both trajectories are first expressed relative to their initial positions.
 
 The scale factor $s$ is calculated by minimising the sum of squared 3D position differences:
 
@@ -123,7 +123,7 @@ $$
 
 ATE measures the overall positional accuracy of the reconstructed trajectory after global scale alignment. Lower values indicate closer agreement with ground truth.
 
-## Results
+## Results and Limitations
 
 The visual odometry pipeline was evaluated on the first 100 frames of KITTI Odometry sequence 00.
 
@@ -149,17 +149,11 @@ The scale-aligned ATE RMSE over the first 100 frames is 2.3665 metres. This mean
 
 These results establish an initial baseline for the monocular visual odometry pipeline. Evaluation over longer sequences is needed to better characterize accumulated drift and performance during more complex camera motion.
 
-### Long-Range Trajectory Evaluation
-
-![Estimated vs. ground-truth trajectory over 1,000 frames](results/trajectory_comparison_1000.png)
-
-The estimated trajectory follows the general shape of the ground-truth route but shows increasing positional error over longer distances, reaching a scale-aligned ATE RMSE of 41.55 m over 1,000 frames. The trajectories begin diverging before the low-motion region around frames 535–561, suggesting that the pose recovery failures were not the primary source of error. Differences in the estimated travel distances along various sections of the route indicate that monocular scale ambiguity may be a significant contributor to the accumulated drift.
-
-## Challenges and Limitations
-
 ### Pose Recovery During Low-Motion Frames
 
 During evaluation on the first 1,000 frames of KITTI sequence 00, the pipeline encountered 13 pose recovery failures, concentrated around frames 535–561. Despite a high number of feature matches and RANSAC inliers, OpenCV's `recoverPose()` could not recover a valid camera pose for these frame pairs. This is likely because the inliers did not provide enough reliable information to validate the camera's movement.
+
+![Frame inspection](results/frame_inspection.png)
 
 Inspection of the corresponding images revealed that the vehicle was approaching a yield sign. Analysis of KITTI ground-truth poses and timestamps confirmed that the vehicle decelerated from approximately 21 km/h to nearly 0 km/h before accelerating again.
 
@@ -167,19 +161,9 @@ This highlighted a limitation of essential-matrix-based motion estimation: when 
 
 To prevent individual failures from terminating the pipeline, a fallback was implemented that retains the previous camera pose when pose recovery fails. Although this enables longer trajectory reconstruction, it assumes zero movement during failed frame pairs and may introduce additional error.
 
-### Monocular Scale Ambiguity
+### Long-Range Trajectory Evaluation
 
-Since we are working with monocoluar imaging, we cannot recover translation magnitude. Instead, we use a unit-length translation vector, so the current implementation assigns the same translation magnitude to every successfully processed frame pair, regardless of the vehicle's actual displacement. This assumption becomes problematic when the vehicle accelerates, decelerates, or stops.
-
-To evaluate the reconstructed trajectory in metres, a single global scale factor is fitted using KITTI ground-truth positions. This corrects the final estimated position, but it cannot correct differences in displacement between individual frame pairs, since it applies the same multiplier to every estimated translation. Ideally, a different translation magnitude would be needed for each frame pair.
-
-Consequently, the reconstructed trajectory remains subject to scale-related errors even after alignment.
-
-### Accumulated Trajectory Drift
-
-Because each camera pose is calculated from the previous accumulated pose, errors in relative rotation and translation propagate through subsequent estimates.
-
-Evaluation on KITTI sequence 00 demonstrated increasing scale-aligned Absolute Trajectory Error (ATE) as the evaluated sequence length increased:
+To evaluate how positional error accumulates over longer sequences, the pipeline was tested on progressively larger frame ranges.
 
 | Frames | Global Scale Factor | ATE RMSE |
 |---|---:|---:|
@@ -188,17 +172,82 @@ Evaluation on KITTI sequence 00 demonstrated increasing scale-aligned Absolute T
 | 500 | 0.7310 | 26.7930 m |
 | 1,000 | 0.7201 | 41.5530 m |
 
-These results demonstrate the limitations of the current monocular visual odometry baseline over longer sequences. Potential contributors include inaccurate relative motion estimates, unknown per-frame translation scale, and approximations made during pose recovery failures.
+Each frame range was evaluated using a separately optimised global scale factor. The increasing ATE demonstrates how positional errors accumulate as the reconstructed trajectory becomes longer.
 
-### Analysis of Trajectory Error
+![Estimated vs. ground-truth trajectory over 1,000 frames](results/trajectory_comparison_1000.png)
 
-Visual comparison of the estimated and ground-truth trajectories over 1,000 frames showed that the pipeline captured the general shape of the route, but accumulated substantial positional error.
+The estimated trajectory follows the general shape of the ground-truth route but shows increasing positional error over longer distances, reaching a scale-aligned ATE RMSE of 41.55 m over 1,000 frames. The trajectories begin diverging before the low-motion region around frames 535–561, suggesting that the pose recovery failures were not the primary source of error. 
 
-Although 13 pose recovery failures occurred around frames 535–561, the trajectories had already begun diverging before this region, with no obvious sudden increase in error near the vehicle's stop. This suggests that the failures were not the primary source of the overall trajectory error.
+Since we are working with monocoluar imaging, we cannot recover translation magnitude. Instead, we use a unit-length translation vector, so the current implementation assigns the same translation magnitude to every successfully processed frame pair, regardless of the vehicle's actual displacement. This assumption becomes problematic when the vehicle accelerates, decelerates, or stops.
 
-Instead, the differences in estimated travel distances along various sections of the route suggest that monocular scale ambiguity may be a significant contributor. To investigate this, the next step is to compare the current baseline against a diagnostic trajectory constructed using ground-truth frame-to-frame displacement magnitudes and estimated camera motion directions.
+To evaluate the reconstructed trajectory in metres, a single global scale factor is fitted using KITTI ground-truth positions. This corrects the final estimated position, but it cannot correct differences in displacement between individual frame pairs. This is because every individual translation vector has a magnitude of 1, so multiplying them all by the same factor produces translation vectors with the same magnitude, but the car actually travels different distances between frames.
 
-This experiment will help distinguish errors caused by translation scale from those caused by inaccurate rotation and translation-direction estimates. Ground-truth displacement will be used only for diagnosis, not as part of the final visual odometry pipeline.
+Differences in the estimated travel distances along various sections of the route indicate that monocular scale ambiguity may be a significant contributor to the accumulated drift.
+
+### Translation Scale Diagnostic
+
+To investigate whether incorrect translation magnitudes were a major source of accumulated trajectory error, a diagnostic experiment was conducted using KITTI ground-truth frame-to-frame distances.
+
+The original visual odometry pipeline assigns a unit-length translation to every successfully processed frame pair. For this experiment, the estimated displacement vectors were multiplied by their corresponding ground-truth distances, preserving the estimated movement directions while correcting their magnitudes to the true distance. The corrected displacements were then accumulated to reconstruct a new trajectory.
+
+![Translation scale diagnostic](results/scale_diagnostic_1000.png)
+
+| Approach | ATE RMSE |
+|---|---:|
+| Original trajectory (global scale alignment) | 41.5530 m |
+| Diagnostic trajectory (ground-truth distances, no global scale alignment) | 46.8495 m |
+
+Replacing the unit-length translations with actual frame-to-frame distances increased ATE RMSE from 41.55 m to 46.85 m over 1,000 frames.
+
+Although the diagnostic trajectory accounts for the vehicle's actual displacement magnitudes, it still deviates substantially from ground truth. This indicates that correcting translation magnitudes alone is insufficient to resolve the accumulated trajectory drift, suggesting that errors in estimated movement directions and camera orientations also contribute.
+
+The higher ATE produced by the diagnostic trajectory does not mean that assigning equal translation magnitudes is more accurate. Since the estimated movement directions may still be incorrect, the globally optimized scale factor used in the baseline can sometimes place estimated positions closer to ground truth, while using the actual displacement magnitudes in the diagnostic may place them farther.
+
+Ground-truth distances were used exclusively for this diagnostic experiment and are not incorporated into the visual odometry pipeline.
+
+### Frame-to-Frame Rotation Error Analysis
+
+Since correcting translation magnitudes did not improve trajectory accuracy, the estimated camera rotations were analyzed to investigate another potential source of drift. Rotation describes the change in the camera's orientation between frames, including turning left or right, tilting up or down, and rolling sideways. Errors in estimated rotations can cause positional drift because each camera movement is transformed into the global coordinate system using the accumulated camera orientation, so an incorrect orientation causes subsequent movements to be accumulated in the wrong direction.
+
+For each consecutive frame pair, the estimated relative rotation was compared against the corresponding KITTI ground-truth rotation. The difference was expressed as a rotation angle in degrees.
+
+![Frame-to-frame rotation error](results/rotation_error_1000.png)
+
+| Metric | Rotation Error |
+|---|---:|
+| Mean | 0.2551° |
+| Median | 0.1557° |
+| Maximum | 8.2092° |
+| RMSE | 0.6000° |
+
+Most frame-to-frame rotation estimates exhibited relatively small errors, with a median of approximately 0.16°. However, several isolated errors reached as high as 8.21°, particularly around frames 365, 460, and 620–640.
+
+These spikes suggest that rotation estimation becomes unreliable for certain frame pairs. Potential causes include incorrect feature correspondences, insufficient parallax, and instability during essential matrix estimation or pose recovery.
+
+Although the typical frame-to-frame errors are small, even occasional inaccurate rotations can affect subsequent camera poses when transformations are accumulated over time.
+
+### Accumulated Rotation Error Analysis
+
+To investigate how individual rotation errors affect long-term orientation accuracy, the accumulated camera orientation at each frame was compared against the corresponding KITTI ground-truth orientation.
+
+Unlike the frame-to-frame analysis, which measures errors in individual relative rotations, this experiment measures the difference between the estimated and actual camera orientations after accumulating all preceding transformations.
+
+![Accumulated rotation error](results/accumulated_rotation_error_1000.png)
+
+| Metric | Accumulated Rotation Error |
+|---|---:|
+| Mean | 14.4719° |
+| Median | 11.0316° |
+| Maximum | 26.1557° |
+| Final frame | 25.8765° |
+
+Despite relatively small frame-to-frame rotation errors, the accumulated orientation error reached approximately 25.88° by frame 999.
+
+The accumulated error exhibited abrupt changes around frames 365, 460, and 620–640, corresponding to several of the largest individual rotation errors. This suggests that occasional inaccurate rotation estimates can have persistent effects on the reconstructed camera orientation. Some later errors may also partially cancel earlier errors, explaining why accumulated rotation error does not increase continuously.
+
+Since accumulated camera orientations determine how subsequent translation vectors are transformed into the global coordinate system, orientation drift is a likely contributor to the observed positional drift.
+
+These findings suggest that improving the reliability of relative rotation estimation is a promising direction for further development. The next step is to investigate the frame pairs with unusually large rotation errors by examining feature-match quality, RANSAC inlier counts, and pose recovery behaviour.
 
 ## Dataset
 
