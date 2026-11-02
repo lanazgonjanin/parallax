@@ -308,7 +308,25 @@ Correcting only 10 rotation estimates reduced ATE RMSE by approximately **65.0%*
 
 These results demonstrate that a small number of inaccurate rotation estimates contributed substantially to accumulated trajectory drift. Unlike the fixed-threshold approach, temporal correction preserved sustained vehicle turns while reducing the effects of isolated rotation errors.
 
-**Limitations:** The correction requires information from future frames, making the current approach suitable for offline trajectory reconstruction rather than real-time estimation. Additionally, the method was developed and evaluated on the same KITTI sequence segment, so further testing is needed to determine whether it generalizes to unseen driving sequences.
+**Limitation:** The correction requires information from future frames, making the current approach suitable for offline trajectory reconstruction rather than real-time estimation.
+
+### Validation on Unseen Frames
+
+To evaluate whether the temporal rotation correction generalises beyond the frames used during development, the method was tested on frames 1000–1999 of KITTI sequence 00, using the same detection thresholds and correction procedure.
+
+Both trajectories were initialized at frame 1000, with KITTI ground-truth poses transformed into the corresponding starting coordinate system for comparison.
+
+![Temporal rotation correction validation](results/temporal_rotation_validation_1000_1999.png)
+
+| Metric | Original Baseline | Temporal Correction |
+|---|---:|---:|
+| Global scale factor | 0.7479 | 0.7760 |
+| ATE RMSE | 100.4963 m | 66.6250 m |
+| Final accumulated rotation error | 10.5705° | 5.2233° |
+
+The method identified and corrected 5 suspicious rotations, reducing ATE RMSE by approximately **33.7%** and final accumulated rotation error by **50.6%**.
+
+These results demonstrate that temporal rotation correction also improves trajectory accuracy on previously unseen frames, although substantial positional drift remains. Further evaluation on additional KITTI sequences would provide stronger evidence of generalization across different driving conditions.
 
 ## Dataset
 

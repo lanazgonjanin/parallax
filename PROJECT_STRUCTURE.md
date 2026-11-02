@@ -28,6 +28,7 @@
 | `scripts/inspect_rotation_context.py` | Examines surrounding images and neighbouring rotation estimates to distinguish rotation errors from actual turns. |
 | `scripts/evaluate_rotation_consistency.py` | Implement and test a temporal consistency rule across the sequence to identify suspicious rotation estimates. |
 | `scripts/test_temporal_rotation_correction.py` | Identifies inconsistent rotation estimates using neighbouring frames, replaces suspicious rotations with estimates derived from surrounding motion, and evaluates the corrected trajectory against the original baseline. |
+| `scripts/validate_temporal_correction.py` | Evaluates temporal rotation correction on an unseen segment of KITTI sequence 00, comparing trajectory accuracy and final accumulated rotation error against the original pipeline. |
 
 The diagnostic scripts are separate from the core visual odometry pipeline. KITTI ground truth is used for evaluation and analysis, not for estimating camera motion in the baseline implementation.
 
