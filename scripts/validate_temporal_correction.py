@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -18,13 +17,12 @@ from src.geometry.essential import (
     recover_camera_pose,
 )
 from src.geometry.trajectory import update_pose
+from src.geometry.temporal import (
+    rotation_angle,
+    detect_rotation_outliers,
+    correct_rotation_outliers,
+)
 from src.evaluation import align_scale, calculate_ate
-
-
-def rotation_angle(R):
-    cos_angle = (np.trace(R) - 1) / 2
-    cos_angle = np.clip(cos_angle, -1.0, 1.0)
-    return np.degrees(np.arccos(cos_angle))
 
 
 def main():
@@ -37,13 +35,14 @@ def main():
 
     calibration = load_calibration("data/calib/00/calib.txt")
     K = get_intrinsic_matrix(calibration)
-    image_paths = get_image_paths("data/sequences/00/image_0")[start_frame:start_frame + num_frames]
+    image_paths = get_image_paths("data/sequences/00/image_0")[
+        start_frame:start_frame + num_frames
+    ]
 
     num_pairs = num_frames - 1
 
     rotations = [None] * num_pairs
     translations = [None] * num_pairs
-    estimated_angles = np.full(num_pairs, np.nan)
 
     image1 = load_image(image_paths[0])
     keypoints1, descriptors1 = detect_orb_features(image1)
@@ -73,7 +72,6 @@ def main():
 
             rotations[i] = R
             translations[i] = t
-            estimated_angles[i] = rotation_angle(R)
 
         except ValueError:
             # Keep the previous pose when recovery fails
@@ -82,60 +80,19 @@ def main():
         keypoints1, descriptors1 = keypoints2, descriptors2
 
     # Identify rotations inconsistent with neighbouring estimates
-    flagged = np.zeros(num_pairs, dtype=bool)
-
-    for i in range(num_pairs):
-        if not np.isfinite(estimated_angles[i]):
-            continue
-
-        before = estimated_angles[max(0, i - window):i]
-        after = estimated_angles[i + 1:min(num_pairs, i + window + 1)]
-
-        neighbours = np.concatenate([before, after])
-        neighbours = neighbours[np.isfinite(neighbours)]
-
-        if len(neighbours) == 0:
-            continue
-
-        nearby_median = np.median(neighbours)
-
-        threshold = max(
-            minimum_angle,
-            median_multiplier * nearby_median,
-        )
-
-        flagged[i] = estimated_angles[i] > threshold
+    flagged = detect_rotation_outliers(
+        rotations,
+        window=window,
+        minimum_angle=minimum_angle,
+        median_multiplier=median_multiplier,
+    )
 
     # Replace suspicious rotations using neighbouring rotation vectors
-    corrected_rotations = rotations.copy()
-
-    for i in np.flatnonzero(flagged):
-        nearby_indices = list(range(max(0, i - window), i))
-        nearby_indices += list(
-            range(i + 1, min(num_pairs, i + window + 1))
-        )
-
-        # Exclude failed recoveries and other flagged rotations
-        nearby_indices = [
-            j for j in nearby_indices
-            if rotations[j] is not None and not flagged[j]
-        ]
-
-        if len(nearby_indices) < 3:
-            continue
-
-        rotation_vectors = np.array([
-            cv2.Rodrigues(rotations[j])[0].ravel()
-            for j in nearby_indices
-        ])
-
-        median_rotation_vector = np.median(
-            rotation_vectors, axis=0
-        )
-
-        corrected_rotations[i] = cv2.Rodrigues(
-            median_rotation_vector
-        )[0]
+    corrected_rotations = correct_rotation_outliers(
+        rotations,
+        flagged,
+        window=window,
+    )
 
     # Reconstruct both trajectories from the same motion estimates
     baseline_pose = np.eye(4)
@@ -159,12 +116,16 @@ def main():
     baseline_trajectory = np.array(baseline_trajectory)
     corrected_trajectory = np.array(corrected_trajectory)
 
-    ground_truth = load_poses("data/poses/00.txt")[start_frame:start_frame + num_frames]
+    ground_truth = load_poses("data/poses/00.txt")[
+        start_frame:start_frame + num_frames
+    ]
 
     # Express ground-truth positions relative to the starting camera pose
     R_start = ground_truth[0, :3, :3]
     p_start = ground_truth[0, :3, 3]
-    ground_truth_positions = (R_start.T @ (ground_truth[:, :3, 3] - p_start).T).T
+    ground_truth_positions = (
+        R_start.T @ (ground_truth[:, :3, 3] - p_start).T
+    ).T
 
     baseline_positions = baseline_trajectory[:, :3, 3]
     corrected_positions = corrected_trajectory[:, :3, 3]
@@ -184,7 +145,10 @@ def main():
     )
 
     # Express the final ground-truth orientation relative to the first frame
-    R_gt = (ground_truth[0, :3, :3].T @ ground_truth[-1, :3, :3])
+    R_gt = (
+        ground_truth[0, :3, :3].T
+        @ ground_truth[-1, :3, :3]
+    )
 
     baseline_rotation_error = rotation_angle(
         R_gt.T @ baseline_trajectory[-1, :3, :3]
@@ -214,7 +178,7 @@ def main():
         f"{corrected_rotation_error:.4f} degrees"
     )
 
-    # Visualise the original and corrected trajectories
+    # Visualize the original and corrected trajectories
     ground_truth_relative = (
         ground_truth_positions - ground_truth_positions[0]
     )
@@ -258,4 +222,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -123,6 +123,23 @@ $$
 
 ATE measures the overall positional accuracy of the reconstructed trajectory after global scale alignment. Lower values indicate closer agreement with ground truth.
 
+## Testing
+
+Automated unit tests verify core functionality, including:
+
+- KITTI data loading and parsing
+- Camera pose transformations and accumulation
+- Global scale alignment and Absolute Trajectory Error (ATE) calculations
+- Temporal rotation outlier detection and correction
+
+Run all tests from the repository root:
+
+```bash
+python -m pytest -v
+```
+
+All 17 tests use synthetic data and do not require the KITTI dataset.
+
 ## Results and Limitations
 
 The visual odometry pipeline was evaluated on the first 100 frames of KITTI Odometry sequence 00.
@@ -307,6 +324,8 @@ The corrected rotations were accumulated with the original estimated translation
 Correcting only 10 rotation estimates reduced ATE RMSE by approximately **65.0%** and final accumulated orientation error by **69.3%** over 1,000 frames.
 
 These results demonstrate that a small number of inaccurate rotation estimates contributed substantially to accumulated trajectory drift. Unlike the fixed-threshold approach, temporal correction preserved sustained vehicle turns while reducing the effects of isolated rotation errors.
+
+Temporal rotation detection and correction are implemented in `src/geometry/temporal.py` and used by both the development and validation scripts.
 
 **Limitation:** The correction requires information from future frames, making the current approach suitable for offline trajectory reconstruction rather than real-time estimation.
 

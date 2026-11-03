@@ -11,6 +11,7 @@
 | `src/geometry/trajectory.py` | Accumulates relative camera transformations to update the estimated camera pose. |
 | `src/odometry.py` | Runs the complete monocular visual odometry pipeline over a sequence of images. |
 | `src/evaluation.py` | Performs global scale alignment and calculates Absolute Trajectory Error (ATE). |
+| `src/geometry/temporal.py` | Detects suspicious camera rotation estimates using temporal consistency and replaces flagged rotations with the median of neighbouring rotation vectors. |
 
 ### Evaluation and Diagnostic Scripts
 
@@ -29,6 +30,7 @@
 | `scripts/evaluate_rotation_consistency.py` | Implement and test a temporal consistency rule across the sequence to identify suspicious rotation estimates. |
 | `scripts/test_temporal_rotation_correction.py` | Identifies inconsistent rotation estimates using neighbouring frames, replaces suspicious rotations with estimates derived from surrounding motion, and evaluates the corrected trajectory against the original baseline. |
 | `scripts/validate_temporal_correction.py` | Evaluates temporal rotation correction on an unseen segment of KITTI sequence 00, comparing trajectory accuracy and final accumulated rotation error against the original pipeline. |
+| `scripts/test_temporal.py` | Tests rotation angle calculations, outlier detection, preservation of genuine turns, rotation correction, and handling of failed pose recoveries. |
 
 The diagnostic scripts are separate from the core visual odometry pipeline. KITTI ground truth is used for evaluation and analysis, not for estimating camera motion in the baseline implementation.
 
@@ -45,8 +47,8 @@ The diagnostic scripts are separate from the core visual odometry pipeline. KITT
 
 | File | Description |
 |---|---|
-| `test/test_geometry.py` | Tests camera pose updates, including identity transformations, translation, rotation, and accumulation of consecutive poses. |
-| `test/test_evaluation.py` | Tests global scale alignment and Absolute Trajectory Error (ATE) calculations, including edge cases. |
-| `test/test_dataset.py` | Tests KITTI pose loading, timestamp loading, and image path ordering using synthetic data and temporary files. |
+| `tests/test_geometry.py` | Tests camera pose updates, including identity transformations, translation, rotation, and accumulation of consecutive poses. |
+| `tests/test_evaluation.py` | Tests global scale alignment and Absolute Trajectory Error (ATE) calculations, including edge cases. |
+| `tests/test_dataset.py` | Tests KITTI pose loading, timestamp loading, and image path ordering using synthetic data and temporary files. |
 
 Tests are implemented using `pytest` and verify core functionality without requiring the KITTI dataset or external storage.
