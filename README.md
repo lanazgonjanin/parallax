@@ -85,7 +85,7 @@ For the first two frames of the driving sequence, 699 of the 868 RANSAC inliers 
 
 To reconstruct the camera's trajectory across multiple frames, the relative camera poses are accumulated into a common coordinate system, with the first camera frame serving as the origin.
 
-For each pair of consecutive frames $i$ and $i+1$, the recovered rotation $R$ and translation direction $\mathbf{t}$ are combined into a homogeneous transformation matrix:
+For each pair of consecutive frames $i$ and $i+1$, the recovered rotation $R$ and translation direction $\mathbf{t}$ are combined into a 4×4 homogeneous transformation matrix belonging to the Special Euclidean Group SE(3), which represents rigid-body rotations and translations in 3D space:
 
 $$
 T_{i \to i+1} =
