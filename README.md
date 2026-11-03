@@ -4,6 +4,24 @@ Parallax is a Python-based monocular visual odometry system that estimates camer
 
 Developed using OpenCV and evaluated on the KITTI Visual Odometry dataset, the project explores the accuracy, computational efficiency, and limitations of vision-based localisation for autonomous driving applications.
 
+## Pipeline Overview
+
+Parallax estimates camera motion from consecutive images using feature matching and geometric motion estimation. Temporal rotation correction is applied as an additional processing step to reduce accumulated trajectory drift.
+
+```mermaid
+flowchart LR
+    A["KITTI Images"] --> B["ORB Features<br/>and Matching"]
+    B --> C["Essential Matrix<br/>+ RANSAC"]
+    C --> D["Pose Recovery<br/>R, t"]
+
+    D --> E["Pose Accumulation"]
+    D --> F["Temporal Rotation<br/>Correction"]
+    F --> G["Corrected Pose<br/>Accumulation"]
+
+    E --> H["KITTI Evaluation<br/>Scale + ATE"]
+    G --> H
+```
+
 ## Methodology
 
 ### ORB Keypoint Detection
@@ -195,7 +213,7 @@ Each frame range was evaluated using a separately optimised global scale factor.
 
 The estimated trajectory follows the general shape of the ground-truth route but shows increasing positional error over longer distances, reaching a scale-aligned ATE RMSE of 41.55 m over 1,000 frames. The trajectories begin diverging before the low-motion region around frames 535–561, suggesting that the pose recovery failures were not the primary source of error. 
 
-Since we are working with monocoluar imaging, we cannot recover translation magnitude. Instead, we use a unit-length translation vector, so the current implementation assigns the same translation magnitude to every successfully processed frame pair, regardless of the vehicle's actual displacement. This assumption becomes problematic when the vehicle accelerates, decelerates, or stops.
+Since we are working with monocular imaging, we cannot recover translation magnitude. Instead, we use a unit-length translation vector, so the current implementation assigns the same translation magnitude to every successfully processed frame pair, regardless of the vehicle's actual displacement. This assumption becomes problematic when the vehicle accelerates, decelerates, or stops.
 
 To evaluate the reconstructed trajectory in metres, a single global scale factor is fitted using KITTI ground-truth positions. This corrects the final estimated position, but it cannot correct differences in displacement between individual frame pairs. This is because every individual translation vector has a magnitude of 1, so multiplying them all by the same factor produces translation vectors with the same magnitude, but the car actually travels different distances between frames.
 
@@ -359,7 +377,7 @@ Geiger, A., Lenz, P., & Urtasun, R. (2012). *Are we ready for autonomous driving
 
 ## Licence
 
-The original source code in this repository is licensed under the MIT Licence. See the [LICENSE](LICENSE) file for details.
+The original source code in this repository is licenced under the MIT Licence. See the [LICENSE](LICENSE) file for details.
 
 The KITTI dataset and any third-party materials are subject to their respective licences and are not covered by this project's MIT Licence.
 
