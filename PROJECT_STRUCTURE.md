@@ -40,3 +40,13 @@ The diagnostic scripts are separate from the core visual odometry pipeline. KITT
 | `data/poses/` | KITTI ground-truth camera poses. |
 | `data/sequences/00/image_0/` | Left-camera images for KITTI sequence 00, accessed through a local link to external storage. |
 | `results/` | Generated trajectory plots, diagnostic visualisations, and evaluation data. |
+
+### Automated Tests
+
+| File | Description |
+|---|---|
+| `test/test_geometry.py` | Tests camera pose updates, including identity transformations, translation, rotation, and accumulation of consecutive poses. |
+| `test/test_evaluation.py` | Tests global scale alignment and Absolute Trajectory Error (ATE) calculations, including edge cases. |
+| `test/test_dataset.py` | Tests KITTI pose loading, timestamp loading, and image path ordering using synthetic data and temporary files. |
+
+Tests are implemented using `pytest` and verify core functionality without requiring the KITTI dataset or external storage.
